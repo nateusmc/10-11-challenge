@@ -17,7 +17,9 @@ describe('Blog Posts', function() {
   });
 
   after(function() {
+    // console.log(closeServer());
     return closeServer();
+ 
   });
 
   it('should list items on GET', function() {
@@ -71,7 +73,6 @@ describe('Blog Posts', function() {
   it('should update blog posts on PUT', function() {
 
     return chai.request(app)
-      // first have to get
       .get('/blog-posts')
       .then(function( res) {
         const updatedPost = Object.assign(res.body[0], {
