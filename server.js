@@ -1,69 +1,59 @@
 'use strict';
 
 const express = require('express');
-const app = express();
 const morgan = require('morgan');
-const {BlogPosts} = require('./model');
-const bodyParser = require('body-parser');
-const jsonParser = bodyParser.json();
+
+const blogPostsRouter = require('./blogPostsRouter');
+const app = express();
+
 
 app.use(morgan('common'));
 
-BlogPosts.create('Cats', 'Space Cats', 'Eddie', '10-11-2017');
+// you need to import `blogPostsRouter` router and route
+// requests to HTTP requests to `/blog-posts` to `blogPostsRouter`
+app.use('/blog-posts', blogPostsRouter);
 
-app.get('/blog-post', (req, res) => {
-  res.json(BlogPosts.get());
-});
+// both runServer and closeServer need to access the same
+// server object, so we declare `server` here, and then when
+// runServer runs, it assigns a value.
+let server;
 
-app.post('/blog-post', jsonParser, (req, res) => {
-  const requiredField = ['title', 'content', 'author', 'publishDate'];
-  for(let i=0; i<requiredField.length; i++){
-    const field = requiredField[i];
-    if(!(field in req.body)){
-      const message = `Cannot post blog due to missing ${field}`;
-      console.error(message);
-      return res.status(400).send(message);
-    } 
-  }
-  const {title, content, author, publishDate} = req.body;
-  const newPost = BlogPosts.create(title, content, author, publishDate);
-  res.json(newPost);
-});
-
-app.delete('/blog-post/:id', (req, res) => {
-  BlogPosts.delete(req.params.id);
-  res.status(204).end();
-});
-
-app.put('/blog-post/:id', jsonParser, (req, res) => {
-  const requiredFields = [
-    'id', 'title', 'content', 'author', 'publishDate'];
-  for (let i=0; i<requiredFields.length; i++) {
-    const field = requiredFields[i];
-    if (!(field in req.body)) {
-      const message = `Missing \`${field}\` in request body`;
-      console.error(message);
-      return res.status(400).send(message);
-    }
-  }
-  if (req.params.id !== req.body.id) {
-    const message = (
-      `Request path id (${req.params.id}) and request body id `
-      + `(${req.body.id}) must match`);
-    console.error(message);
-    return res.status(400).send(message);
-  }
-  console.log(`Updating blog post with id \`${req.params.id}\``);
-  const updatedItem = BlogPosts.update({
-    id: req.params.id,
-    title: req.body.title,
-    content: req.body.content,
-    author: req.body.author,
-    publishDate: req.body.publishDate
+// this function starts our server and returns a Promise.
+// In our test code, we need a way of asynchronously starting
+// our server, since we'll be dealing with promises there.
+function runServer() {
+  const port = process.env.PORT || 8080;
+  return new Promise((resolve, reject) => {
+    server = app.listen(port, () => {
+      console.log(`Your app is listening on port ${port}`);
+      resolve(server);
+    }).on('error', err => {
+      reject(err)
+    });
   });
-  res.status(204).end();
-});
+}
 
-app.listen(8080, ()=> {
-  console.log('Your app is listening on 8080');
-});
+// like `runServer`, this function also needs to return a promise.
+// `server.close` does not return a promise on its own, so we manually
+// create one.
+function closeServer() {
+  return new Promise((resolve, reject) => {
+    console.log('Closing server');
+    server.close(err => {
+      if (err) {
+        reject(err);
+        // so we don't also call `resolve()`
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+// if server.js is called directly (aka, with `node server.js`), this block
+// runs. but we also export the runServer command so other code (for instance, test code) can start the server as needed.
+if (require.main === module) {
+  runServer().catch(err => console.error(err));
+};
+
+module.exports = {app, runServer, closeServer};
